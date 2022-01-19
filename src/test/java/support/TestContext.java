@@ -25,10 +25,59 @@ import java.util.Map;
 
 public class TestContext {
 
-    private static WebDriver driver;
+    private static WebDriver driver = null;
+    private static Runnable driverCreation = null;
+    private static Runnable driverOnScenarioStart = null;
+    private static Object driverOptions = null;
+
+    private static void cleanup() {
+        driver = null;
+        driverCreation = null;
+        driverOnScenarioStart = null;
+        driverOptions = null;
+    }
 
     public static WebDriver getDriver() {
+        if (driver == null) {
+            driverCreation.run();
+            if (driverOnScenarioStart != null) {
+                driverOnScenarioStart.run();
+                driverOnScenarioStart = null;
+            }
+        }
         return driver;
+    }
+
+    /**
+     * A way to modify web driver options in step definitions.
+     * <p>
+     * Call {@link #reapplyDriverOptions()} to reapply.
+     *
+     * @return current web driver options
+     */
+    public static Object getDriverOptions() {
+        return driverOptions;
+    }
+
+    /**
+     * To be called on scenario start.
+     *
+     * @param v Code to be executed on first browser start during scenario execution.
+     */
+    public static void setDriverOnScenarioStart(final Runnable v) {
+        driverOnScenarioStart = v;
+    }
+
+    /**
+     * Reapplies the web driver options. The browser will exit and start on the next {@link #getDriver()}.
+     */
+    public static void reapplyDriverOptions() {
+        if (driverCreation != null) {
+            if (driver != null) {
+                driver.quit();
+                driver = null;
+            }
+        }
     }
 
     public static void initialize() {
@@ -37,22 +86,24 @@ public class TestContext {
 
     public static void teardown() {
         driver.quit();
+        cleanup();
     }
 
-    public static void initialize(String browser, String testEnv, boolean isHeadless) {
-        Dimension size = new Dimension(1920, 1080);
-        Point position = new Point(0, 0);
+    public static void initialize(final String browser, final String testEnv, final boolean isHeadless) {
+        cleanup();
+        final Dimension size = new Dimension(1920, 1080);
+        final Point position = new Point(0, 0);
         if (testEnv.equals("local")) {
             switch (browser) {
                 case "chrome":
                     WebDriverManager.chromedriver().setup();
-                    Map<String, Object> chromePreferences = new HashMap<>();
+                    final Map<String, Object> chromePreferences = new HashMap<>();
                     chromePreferences.put("profile.default_content_settings.geolocation", 2);
                     chromePreferences.put("download.prompt_for_download", false);
                     chromePreferences.put("download.directory_upgrade", true);
                     chromePreferences.put("credentials_enable_service", false);
                     chromePreferences.put("password_manager_enabled", false);
-                    ChromeOptions chromeOptions = new ChromeOptions();
+                    final ChromeOptions chromeOptions = new ChromeOptions();
                     chromeOptions.addArguments("--start-maximized");
                     chromeOptions.setExperimentalOption("prefs", chromePreferences);
                     System.setProperty(ChromeDriverService.CHROME_DRIVER_SILENT_OUTPUT_PROPERTY, "true");
@@ -61,13 +112,14 @@ public class TestContext {
                         chromeOptions.addArguments("--window-size=" + size.getWidth() + "," + size.getHeight());
                         chromeOptions.addArguments("--disable-gpu");
                     }
-                    driver = new ChromeDriver(chromeOptions);
+                    driverOptions = chromeOptions;
+                    driverCreation = () -> driver = new ChromeDriver(chromeOptions);
                     break;
                 case "firefox":
                     WebDriverManager.firefoxdriver().setup();
-                    FirefoxOptions firefoxOptions = new FirefoxOptions();
+                    final FirefoxOptions firefoxOptions = new FirefoxOptions();
                     if (isHeadless) {
-                        FirefoxBinary firefoxBinary = new FirefoxBinary();
+                        final FirefoxBinary firefoxBinary = new FirefoxBinary();
                         firefoxBinary.addCommandLineOptions("--headless");
                         firefoxOptions.setBinary(firefoxBinary);
                     }
@@ -89,14 +141,14 @@ public class TestContext {
                 default:
                     throw new RuntimeException("Driver is not implemented for: " + browser);
             }
-        } else if (testEnv.equals("grid")){
-            DesiredCapabilities capabilities = new DesiredCapabilities();
+        } else if (testEnv.equals("grid")) {
+            final DesiredCapabilities capabilities = new DesiredCapabilities();
             capabilities.setBrowserName(browser);
             capabilities.setPlatform(Platform.ANY);
             try {
-                URL hubUrl = new URL("http://localhost:4444/wd/hub");
+                final URL hubUrl = new URL("http://localhost:4444/wd/hub");
                 driver = new RemoteWebDriver(hubUrl, capabilities);
-            } catch (MalformedURLException e) {
+            } catch (final MalformedURLException e) {
                 throw new RuntimeException(e.getMessage());
             }
         } else {
