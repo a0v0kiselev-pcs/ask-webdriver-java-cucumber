@@ -58,7 +58,7 @@ public class TestContext {
                     System.setProperty(ChromeDriverService.CHROME_DRIVER_SILENT_OUTPUT_PROPERTY, "true");
                     if (isHeadless) {
                         chromeOptions.setHeadless(true);
-                        chromeOptions.addArguments("--window-size=" + size.getWidth() + "," + size.getWidth());
+                        chromeOptions.addArguments("--window-size=" + size.getWidth() + "," + size.getHeight());
                         chromeOptions.addArguments("--disable-gpu");
                     }
                     driver = new ChromeDriver(chromeOptions);
