@@ -85,7 +85,8 @@ public class TestContext {
     }
 
     public static void teardown() {
-        driver.quit();
+        if (driver != null)
+            driver.quit();
         cleanup();
     }
 
